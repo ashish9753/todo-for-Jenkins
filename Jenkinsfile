@@ -35,9 +35,7 @@ pipeline {
             steps {
                 dir('backend') {
                     echo 'Testing the backend...'
-                    bat '''
-                    npm test
-                    '''
+                    bat 'npm test'
                 }
             }
         }
@@ -45,18 +43,14 @@ pipeline {
         stage('Build Backend Docker Image') {
             steps {
                 echo 'Building Backend Docker image...'
-                bat '''
-                docker build -t %DOCKER_HUB_USERNAME%/todo-backend:latest ./backend
-                '''
+                bat 'docker build -t %DOCKER_HUB_USERNAME%/todo-backend:latest ./backend'
             }
         }
 
         stage('Build Frontend Docker Image') {
             steps {
                 echo 'Building Frontend Docker image...'
-                bat '''
-                docker build -t %DOCKER_HUB_USERNAME%/todo-frontend:latest ./frontend
-                '''
+                bat 'docker build -t %DOCKER_HUB_USERNAME%/todo-frontend:latest ./frontend'
             }
         }
 
@@ -74,15 +68,16 @@ pipeline {
         stage('Deploy to AWS EC2') {
             steps {
                 echo 'Deploying to AWS EC2...'
-                sshagent(['EC2_SSH_KEY']) {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'EC2_SSH_KEY',
+                        keyFileVariable: 'SSH_KEY_FILE',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
                     bat """
-                    ssh -o StrictHostKeyChecking=no ubuntu@%EC2_HOST% ^
-                    "docker pull %DOCKER_HUB_USERNAME%/todo-backend:latest && ^
-                     docker pull %DOCKER_HUB_USERNAME%/todo-frontend:latest && ^
-                     docker stop todo-backend todo-frontend || true && ^
-                     docker rm todo-backend todo-frontend || true && ^
-                     docker run -d --name todo-backend -p 5000:5000 -e MONGO_URI=%MONGO_URI% %DOCKER_HUB_USERNAME%/todo-backend:latest && ^
-                     docker run -d --name todo-frontend -p 3000:80 %DOCKER_HUB_USERNAME%/todo-frontend:latest"
+                    icacls %SSH_KEY_FILE% /inheritance:r /grant:r "%USERNAME%:R"
+                    ssh -i %SSH_KEY_FILE% -o StrictHostKeyChecking=no ubuntu@%EC2_HOST% "docker pull %DOCKER_HUB_USERNAME%/todo-backend:latest && docker pull %DOCKER_HUB_USERNAME%/todo-frontend:latest && docker stop todo-backend todo-frontend || true && docker rm todo-backend todo-frontend || true && docker run -d --name todo-backend -p 5000:5000 -e MONGO_URI=%MONGO_URI% %DOCKER_HUB_USERNAME%/todo-backend:latest && docker run -d --name todo-frontend -p 3000:80 %DOCKER_HUB_USERNAME%/todo-frontend:latest"
                     """
                 }
             }
@@ -91,7 +86,7 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline success! App deploy ho gayi.'
+            echo 'Pipeline success! App AWS pe live hai.'
         }
         failure {
             echo 'Pipeline fail hui. Kuch toot gaya — deploy nahi hua.'
