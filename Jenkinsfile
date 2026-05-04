@@ -18,48 +18,52 @@ pipeline {
 
         stage('Install Backend Dependencies') {
             steps {
-                echo 'Backend dependencies installing...'
-                sh 'npm install'
+                dir('backend') {
+                    echo 'Backend dependencies installing...'
+                    bat 'npm install'
+                }
             }
         }
 
         stage('Run tests') {
             steps {
-                echo 'Testing the backend...'
-                sh 'npm test'
+                dir('backend') {
+                    echo 'Testing the backend...'
+                    bat 'npm test'
+                }
             }
         }
 
         stage('Build Backend Docker Image') {
             steps {
-                echo 'Backend Docker image build kar raha hoon...'
-                sh 'docker build -t $DOCKER_HUB_USERNAME/todo-backend:latest ./backend'
+                echo 'Building Backend Docker image...'
+                bat 'docker build -t %DOCKER_HUB_USERNAME%/todo-backend:latest ./backend'
             }
         }
 
         stage('Build Frontend Docker Image') {
             steps {
-                echo 'Frontend Docker image build kar raha hoon...'
-                sh 'docker build -t $DOCKER_HUB_USERNAME/todo-frontend:latest ./frontend'
+                echo 'Building Frontend Docker image...'
+                bat 'docker build -t %DOCKER_HUB_USERNAME%/todo-frontend:latest ./frontend'
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                echo 'Docker Hub pe push kar raha hoon...'
-                sh 'echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin'
-                sh 'docker push $DOCKER_HUB_USERNAME/todo-backend:latest'
-                sh 'docker push $DOCKER_HUB_USERNAME/todo-frontend:latest'
+                echo 'Pushing to Docker Hub...'
+                bat 'echo %DOCKER_HUB_PASSWORD% | docker login -u %DOCKER_HUB_USERNAME% --password-stdin'
+                bat 'docker push %DOCKER_HUB_USERNAME%/todo-backend:latest'
+                bat 'docker push %DOCKER_HUB_USERNAME%/todo-frontend:latest'
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploy kar raha hoon...'
-                sh '''
-                    export MONGO_URI=$MONGO_URI
-                    docker-compose down
-                    docker-compose up -d
+                echo 'Deploying app...'
+                bat '''
+                set MONGO_URI=%MONGO_URI%
+                docker-compose down
+                docker-compose up -d
                 '''
             }
         }
