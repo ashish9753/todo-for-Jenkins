@@ -74,7 +74,7 @@ pipeline {
             steps {
                 echo 'Deploying app...'
                 bat '''
-                set MONGO_URI=%MONGO_URI%
+                echo MONGO_URI=%MONGO_URI%> backend\.env
                 docker-compose down
                 docker-compose up -d
                 '''
