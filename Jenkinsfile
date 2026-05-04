@@ -5,6 +5,7 @@ pipeline {
         DOCKER_HUB_USERNAME = credentials('DOCKER_HUB_USERNAME')
         DOCKER_HUB_PASSWORD = credentials('DOCKER_HUB_PASSWORD')
         MONGO_URI = credentials('MONGO_URI')
+        EC2_HOST = credentials('EC2_HOST')
     }
 
     stages {
@@ -70,14 +71,20 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to AWS EC2') {
             steps {
-                echo 'Deploying app...'
-                bat '''
-                echo MONGO_URI=%MONGO_URI%> backend/.env
-                docker-compose down
-                docker-compose up -d
-                '''
+                echo 'Deploying to AWS EC2...'
+                sshagent(['EC2_SSH_KEY']) {
+                    bat """
+                    ssh -o StrictHostKeyChecking=no ubuntu@%EC2_HOST% ^
+                    "docker pull %DOCKER_HUB_USERNAME%/todo-backend:latest && ^
+                     docker pull %DOCKER_HUB_USERNAME%/todo-frontend:latest && ^
+                     docker stop todo-backend todo-frontend || true && ^
+                     docker rm todo-backend todo-frontend || true && ^
+                     docker run -d --name todo-backend -p 5000:5000 -e MONGO_URI=%MONGO_URI% %DOCKER_HUB_USERNAME%/todo-backend:latest && ^
+                     docker run -d --name todo-frontend -p 3000:80 %DOCKER_HUB_USERNAME%/todo-frontend:latest"
+                    """
+                }
             }
         }
     }
