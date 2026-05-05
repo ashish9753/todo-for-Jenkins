@@ -37,21 +37,20 @@ pipeline {
         stage('Build & Push Docker Images') {
             steps {
 
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
+                withCredentials([
+                    string(credentialsId: 'DOCKER_HUB_USERNAME', variable: 'DOCKER_USER'),
+                    string(credentialsId: 'DOCKER_HUB_PASSWORD', variable: 'DOCKER_PASS')
+                ]) {
 
                     echo "Using Docker user: %DOCKER_USER%"
 
-                    // BUILD
+                    // BUILD IMAGES
                     bat '''
                     docker build -t %DOCKER_USER%/todo-backend:latest ./backend
                     docker build -t %DOCKER_USER%/todo-frontend:latest ./frontend
                     '''
 
-                    // LOGIN + PUSH (PowerShell fix)
+                    // LOGIN + PUSH (PowerShell safe)
                     powershell '''
                     $env:DOCKER_PASS | docker login -u $env:DOCKER_USER --password-stdin
 
@@ -65,7 +64,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ SUCCESS: Images pushed to Docker Hub'
+            echo '✅ SUCCESS: Images pushed to Docker Hub!'
         }
         failure {
             echo '❌ FAILED: Check logs'
