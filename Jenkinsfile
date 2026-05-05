@@ -2,8 +2,6 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_USERNAME = credentials('DOCKER_HUB_USERNAME')
-        DOCKER_HUB_PASSWORD = credentials('DOCKER_HUB_PASSWORD')
         MONGO_URI = credentials('MONGO_URI')
     }
 
@@ -11,7 +9,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Pulling the code from github...'
+                echo 'Pulling code from GitHub...'
                 checkout scm
             }
         }
@@ -19,7 +17,7 @@ pipeline {
         stage('Install Backend Dependencies') {
             steps {
                 dir('backend') {
-                    echo 'Backend dependencies installing...'
+                    echo 'Installing backend dependencies...'
                     bat '''
                     node -v
                     npm -v
@@ -30,10 +28,10 @@ pipeline {
             }
         }
 
-        stage('Run tests') {
+        stage('Run Tests') {
             steps {
                 dir('backend') {
-                    echo 'Testing the backend...'
+                    echo 'Running tests...'
                     bat 'npm test'
                 }
             }
@@ -41,36 +39,49 @@ pipeline {
 
         stage('Build Backend Docker Image') {
             steps {
-                echo 'Building Backend Docker image...'
-                bat 'docker build -t %DOCKER_HUB_USERNAME%/todo-backend:latest ./backend'
+                echo 'Building backend Docker image...'
+                bat 'docker build -t %DOCKER_USER%/todo-backend:latest ./backend'
             }
         }
 
         stage('Build Frontend Docker Image') {
             steps {
-                echo 'Building Frontend Docker image...'
-                bat 'docker build -t %DOCKER_HUB_USERNAME%/todo-frontend:latest ./frontend'
+                echo 'Building frontend Docker image...'
+                bat 'docker build -t %DOCKER_USER%/todo-frontend:latest ./frontend'
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                echo 'Pushing to Docker Hub...'
-                bat '''
-                echo %DOCKER_HUB_PASSWORD% | docker login -u %DOCKER_HUB_USERNAME% --password-stdin
-                docker push %DOCKER_HUB_USERNAME%/todo-backend:latest
-                docker push %DOCKER_HUB_USERNAME%/todo-frontend:latest
-                '''
+                echo 'Logging into Docker Hub & pushing images...'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    powershell '''
+                    Write-Host "Logging into Docker Hub..."
+                    $env:DOCKER_PASS | docker login -u $env:DOCKER_USER --password-stdin
+
+                    Write-Host "Pushing backend image..."
+                    docker push $env:DOCKER_USER/todo-backend:latest
+
+                    Write-Host "Pushing frontend image..."
+                    docker push $env:DOCKER_USER/todo-frontend:latest
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline success! Images Docker Hub par push ho gayi.'
+            echo '✅ Pipeline SUCCESS: Images pushed to Docker Hub!'
         }
         failure {
-            echo 'Pipeline fail hui. Build ya push me issue hai.'
+            echo '❌ Pipeline FAILED: Check logs for errors.'
         }
     }
 }
