@@ -5,7 +5,6 @@ pipeline {
         DOCKER_HUB_USERNAME = credentials('DOCKER_HUB_USERNAME')
         DOCKER_HUB_PASSWORD = credentials('DOCKER_HUB_PASSWORD')
         MONGO_URI = credentials('MONGO_URI')
-        EC2_HOST = credentials('EC2_HOST')
     }
 
     stages {
@@ -64,37 +63,14 @@ pipeline {
                 '''
             }
         }
-
-        stage('Deploy to AWS EC2') {
-            steps {
-                echo 'Deploying to AWS EC2...'
-                withCredentials([
-                    sshUserPrivateKey(
-                        credentialsId: 'EC2_SSH_KEY',
-                        keyFileVariable: 'SSH_KEY_FILE',
-                        usernameVariable: 'SSH_USER'
-                    )
-                ]) {
-                    bat """
-                        copy %SSH_KEY_FILE% %TEMP%\\ec2-key.pem
-                        icacls %TEMP%\\ec2-key.pem /inheritance:r
-                        icacls %TEMP%\\ec2-key.pem /remove "BUILTIN\\Users"
-                        icacls %TEMP%\\ec2-key.pem /remove "Everyone"
-                        icacls %TEMP%\\ec2-key.pem /grant:r "%USERNAME%:(R)"
-                        ssh -i %TEMP%\\ec2-key.pem -o StrictHostKeyChecking=no ubuntu@%EC2_HOST% "docker pull %DOCKER_HUB_USERNAME%/todo-backend:latest && docker pull %DOCKER_HUB_USERNAME%/todo-frontend:latest && docker stop todo-backend todo-frontend || true && docker rm todo-backend todo-frontend || true && docker run -d --name todo-backend -p 5000:5000 -e MONGO_URI=%MONGO_URI% %DOCKER_HUB_USERNAME%/todo-backend:latest && docker run -d --name todo-frontend -p 3000:80 %DOCKER_HUB_USERNAME%/todo-frontend:latest"
-                        del %TEMP%\\ec2-key.pem
-                    """
-                }
-            }
-        }
     }
 
     post {
         success {
-            echo 'Pipeline success! App AWS pe live hai.'
+            echo 'Pipeline success! Images Docker Hub par push ho gayi.'
         }
         failure {
-            echo 'Pipeline fail hui. Kuch toot gaya — deploy nahi hua.'
+            echo 'Pipeline fail hui. Build ya push me issue hai.'
         }
     }
 }
